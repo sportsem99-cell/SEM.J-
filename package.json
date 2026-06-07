@@ -1,0 +1,24 @@
+{
+  "name": "semj-booking",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@11.5.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "unrs-resolver",
+      "turbo",
+      "@turbo/windows-64",
+      "esbuild",
+      "sharp"
+    ]
+  }
+}

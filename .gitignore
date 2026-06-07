@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# Next.js
+.next
+out
+build
+
+# env files (보안상 절대 올리면 안됨)
+.env
+.env.local
+.env.*.local
+
+# Turbo
+.turbo
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
