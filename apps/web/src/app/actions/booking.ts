@@ -38,7 +38,8 @@ export async function createBooking(data: BookingFormData) {
     .from('programs')
     .select('id, duration_min')
     .eq('org_id', ORG_ID)
-    .eq('type', data.programType)
+    .eq('name', data.programType)
+    .limit(1)
     .single()
 
   if (programError || !program) {

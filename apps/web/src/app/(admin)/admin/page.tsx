@@ -1,21 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const ORG_ID = '00000000-0000-0000-0000-000000000001'
 
 export default async function AdminDashboard() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date()
-  todayEnd.setHours(23, 59, 59, 999)
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+  const monthEnd = new Date()
+  monthEnd.setMonth(monthEnd.getMonth() + 1)
+  monthEnd.setDate(0)
+  monthEnd.setHours(23, 59, 59, 999)
 
   const { data: todayBookings } = await supabase
     .from('bookings')
     .select(`id, status, total_amount, start_at, programs ( name )`)
     .eq('org_id', ORG_ID)
-    .gte('start_at', todayStart.toISOString())
-    .lte('start_at', todayEnd.toISOString())
+    .gte('start_at', monthStart.toISOString())
+    .lte('start_at', monthEnd.toISOString())
     .order('start_at', { ascending: true })
 
   const { count: totalBookings } = await supabase
@@ -32,7 +35,7 @@ export default async function AdminDashboard() {
     .reduce((sum, b) => sum + (b.total_amount ?? 0), 0)
 
   const statCards = [
-    { icon: '📅', label: '오늘 예약',  value: `${bookings.length}건` },
+    { icon: '📅', label: '이번달 예약',  value: `${bookings.length}건` },
     { icon: '✅', label: '확정',       value: `${confirmed}건` },
     { icon: '⏳', label: '대기 중',    value: `${pending}건` },
     { icon: '💰', label: '오늘 매출',  value: `${todayRevenue.toLocaleString()}원` },
@@ -69,14 +72,14 @@ export default async function AdminDashboard() {
       {/* 오늘 예약 목록 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-800">오늘 예약 현황</h2>
+          <h2 className="font-bold text-gray-800">이번 달 예약 현황</h2>
           <span className="text-xs text-gray-400">전체 누적 {totalBookings ?? 0}건</span>
         </div>
 
         {bookings.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <p className="text-4xl mb-3">📅</p>
-            <p className="text-sm">오늘 예약이 없습니다</p>
+            <p className="text-sm">이번 달 예약이 없습니다</p>
           </div>
         ) : (
           <div className="space-y-3">

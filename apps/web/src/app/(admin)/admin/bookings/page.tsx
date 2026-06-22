@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import AdminBookingsClient from './AdminBookingsClient'
 
 const ORG_ID = '00000000-0000-0000-0000-000000000001'
@@ -14,8 +14,7 @@ export default async function AdminBookingsPage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createClient()
-
+  const supabase = createAdminClient()
   let query = supabase
     .from('bookings')
     .select(`

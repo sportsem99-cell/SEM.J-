@@ -6,8 +6,10 @@ const PROGRAMS = [
     type: 'experience',
     name: '체험승마',
     desc: '처음 타시는 분도 OK! 말과 교감하는 특별한 경험. 안전 장비 제공 및 전문 강사 동행.',
-    price: 30000,
-    duration: 60,
+    priceMain: '20,000원',
+    priceDetail: '1회 (10분 기승)',
+    priceExtra: '',
+    duration: 10,
     capacity: 6,
     icon: '🐴',
     tags: ['입문', '가족', '단체'],
@@ -16,27 +18,21 @@ const PROGRAMS = [
     type: 'private',
     name: '개인레슨',
     desc: '1:1 맞춤 지도로 빠른 실력 향상. 초보부터 심화까지 수준별 맞춤 커리큘럼.',
-    price: 60000,
+    priceMain: '45,000원',
+    priceDetail: '1회 · 10회 450,000원',
+    priceExtra: '괴산군민 1회 38,250원 · 10회 382,500원',
     duration: 60,
     capacity: 1,
     icon: '🏇',
     tags: ['1:1', '심화', '성인'],
   },
   {
-    type: 'group',
-    name: '그룹레슨',
-    desc: '소그룹(최대 6명)으로 함께 배우는 승마. 또래와 함께 즐겁게 배울 수 있어요.',
-    price: 40000,
-    duration: 60,
-    capacity: 6,
-    icon: '👥',
-    tags: ['그룹', '친목', '소그룹'],
-  },
-  {
     type: 'youth',
     name: '유소년 프로그램',
     desc: '어린이·청소년을 위한 맞춤 승마 교육. 말과의 교감으로 정서 발달에 도움.',
-    price: 35000,
+    priceMain: '315,000원',
+    priceDetail: '10회 (괴산군 유소년)',
+    priceExtra: '단체 10인 이상 인당 25,000원',
     duration: 60,
     capacity: 6,
     icon: '🌟',
@@ -69,22 +65,29 @@ export default function ProgramsPage() {
               <h2 className="text-xl font-bold text-gray-800 mb-1">{p.name}</h2>
               <p className="text-sm text-gray-500 mb-4 leading-relaxed">{p.desc}</p>
 
-              <div className="flex gap-4 text-sm text-gray-600 mb-5">
+              <div className="flex gap-4 text-sm text-gray-600 mb-4">
                 <span>⏱ {p.duration}분</span>
                 <span>👥 최대 {p.capacity}명</span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-xl font-bold text-brand-green-700">
-                  {p.price.toLocaleString()}원
-                </span>
-                <Link
-                  href={`/booking/${p.type}`}
-                  className="bg-brand-green-700 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-brand-green-600 transition-colors"
-                >
-                  예약하기
-                </Link>
+              <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4 space-y-1.5">
+                <div>
+                  <p className="text-xl font-black text-brand-green-700">{p.priceMain}</p>
+                  <p className="text-xs text-gray-500">{p.priceDetail}</p>
+                </div>
+                {p.priceExtra && (
+                  <div className="border-t border-gray-200 pt-1.5">
+                    <p className="text-sm font-bold text-brand-green-600">{p.priceExtra}</p>
+                  </div>
+                )}
               </div>
+
+              <Link
+                href={`/booking/${p.type}`}
+                className="block text-center bg-brand-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-green-600 transition-colors"
+              >
+                예약하기
+              </Link>
             </div>
           ))}
         </div>

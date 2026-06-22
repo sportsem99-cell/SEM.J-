@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { updateBookingStatus } from '@/app/actions/admin'
 
 const STATUS_TABS = [
   { value: 'all', label: '전체' },
@@ -137,15 +138,17 @@ export default function AdminBookingsClient({ bookings, currentStatus, currentDa
                         </div>
                       ))}
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      {b.status === 'pending' && (
-                        <>
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        {b.status === 'pending' && (
                           <ConfirmButton bookingId={b.id} action="confirmed" label="✅ 예약 확정" />
-                          <ConfirmButton bookingId={b.id} action="cancelled" label="❌ 취소" variant="danger" />
-                        </>
-                      )}
-                      {b.status === 'confirmed' && (
-                        <ConfirmButton bookingId={b.id} action="completed" label="🏁 완료 처리" />
+                        )}
+                        {b.status === 'confirmed' && (
+                          <ConfirmButton bookingId={b.id} action="completed" label="🏁 완료 처리" />
+                        )}
+                      </div>
+                      {(b.status === 'pending' || b.status === 'confirmed') && (
+                        <CancelButton bookingId={b.id} />
                       )}
                     </div>
                   </div>
@@ -163,21 +166,65 @@ function ConfirmButton({ bookingId, action, label, variant = 'primary' }: {
   bookingId: string; action: string; label: string; variant?: 'primary' | 'danger'
 }) {
   const router = useRouter()
-  const handleClick = async () => {
-    await fetch('/api/admin/bookings/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingId, status: action }),
+  const [isPending, startTransition] = useTransition()
+
+  const handleClick = () => {
+    startTransition(async () => {
+      const result = await updateBookingStatus(bookingId, action)
+      if (result?.error) alert(result.error)
+      else router.refresh()
     })
-    router.refresh()
   }
+
   return (
-    <button onClick={handleClick}
-      className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors
+    <button onClick={handleClick} disabled={isPending}
+      className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50
         ${variant === 'danger'
           ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
           : 'bg-brand-green-700 text-white hover:bg-brand-green-600'}`}>
-      {label}
+      {isPending ? '처리 중...' : label}
     </button>
+  )
+}
+
+function CancelButton({ bookingId }: { bookingId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [isPending, startTransition] = useTransition()
+
+  const handleCancel = () => {
+    startTransition(async () => {
+      const result = await updateBookingStatus(bookingId, 'cancelled', reason)
+      if (result?.error) alert(result.error)
+      else { setOpen(false); setReason(''); router.refresh() }
+    })
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)}
+      className="px-4 py-2 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors">
+      ❌ 예약 취소
+    </button>
+  )
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-bold text-red-700">취소 사유 입력</p>
+      <textarea value={reason} onChange={e => setReason(e.target.value)}
+        placeholder="예: 강사 사정으로 인한 취소, 날씨 사정 등"
+        rows={2}
+        className="w-full text-sm border border-red-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none bg-white" />
+      <div className="flex gap-2">
+        <button onClick={handleCancel} disabled={isPending || !reason.trim()}
+          className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 hover:bg-red-700 transition-colors">
+          {isPending ? '처리 중...' : '취소 확정'}
+        </button>
+        <button onClick={() => { setOpen(false); setReason('') }}
+          className="px-4 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors">
+          닫기
+        </button>
+      </div>
+    </div>
   )
 }

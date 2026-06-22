@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import AdminCalendarClient from './AdminCalendarClient'
 
 const ORG_ID = '00000000-0000-0000-0000-000000000001'
@@ -13,7 +13,7 @@ export default async function AdminCalendarPage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const today = new Date().toISOString().split('T')[0]
   const selectedDate = params.date || today

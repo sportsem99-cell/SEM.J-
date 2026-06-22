@@ -5,29 +5,45 @@ import { createBooking, type BookingFormData } from '@/app/actions/booking'
 
 type Step = 1 | 2 | 3 | 4 | 5
 
+interface SavedProfile {
+  name?: string | null; phone?: string | null; birth_date?: string | null
+  gender?: string | null; height_cm?: number | null; weight_kg?: number | null
+  experience?: string | null; allergy?: boolean | null; allergy_desc?: string | null
+  condition?: boolean | null; condition_desc?: string | null
+}
+
 interface Props {
   programType: string
   program: { name: string; price: number; capacity: number }
+  savedProfile?: SavedProfile | null
 }
 
 const TIMES = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00']
 
 const STEP_LABELS = ['날짜·시간', '예약자', '이용자', '건강정보', '최종확인']
 
-export default function BookingWizard({ programType, program }: Props) {
+export default function BookingWizard({ programType, program, savedProfile }: Props) {
   const [step, setStep] = useState<Step>(1)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
 
+  const [payMethod, setPayMethod] = useState<'card' | 'transfer' | ''>('')
+
   const [form, setForm] = useState({
     date: '', time: '',
-    bookerName: '', bookerPhone: '',
+    bookerName: savedProfile?.name || '',
+    bookerPhone: savedProfile?.phone || '',
     sameAsBooker: false,
-    riderName: '', riderBirthDate: '', riderGender: '',
-    riderWeightKg: '', riderHeightCm: '',
-    experience: '',
-    allergy: false, allergyDesc: '',
-    condition: false, conditionDesc: '',
+    riderName: savedProfile?.name || '',
+    riderBirthDate: savedProfile?.birth_date || '',
+    riderGender: savedProfile?.gender || '',
+    riderWeightKg: savedProfile?.weight_kg?.toString() || '',
+    riderHeightCm: savedProfile?.height_cm?.toString() || '',
+    experience: savedProfile?.experience || '',
+    allergy: savedProfile?.allergy ?? false,
+    allergyDesc: savedProfile?.allergy_desc || '',
+    condition: savedProfile?.condition ?? false,
+    conditionDesc: savedProfile?.condition_desc || '',
     notes: '',
   })
 
@@ -37,7 +53,10 @@ export default function BookingWizard({ programType, program }: Props) {
   const canNext = () => {
     if (step === 1) return !!form.date && !!form.time
     if (step === 2) return !!form.bookerName && !!form.bookerPhone
-    if (step === 3) return !!form.riderName && !!form.riderGender && !!form.experience && !!form.riderWeightKg
+    if (step === 3) {
+      const nameOk = form.sameAsBooker || !!form.riderName
+      return nameOk && !!form.riderGender && !!form.experience && !!form.riderWeightKg
+    }
     return true
   }
 
@@ -278,6 +297,40 @@ export default function BookingWizard({ programType, program }: Props) {
               <span className="font-bold text-brand-green-700 text-base">{program.price.toLocaleString()}원</span>
             </div>
           </div>
+          {/* 결제 방법 선택 */}
+          <div>
+            <p className="text-sm font-bold text-gray-700 mb-3">결제 방법 선택 *</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setPayMethod('card')}
+                className={`py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1
+                  ${payMethod === 'card' ? 'border-brand-green-700 bg-brand-green-50 text-brand-green-700' : 'border-gray-200 text-gray-600 hover:border-brand-green-300'}`}>
+                <span className="text-2xl">💳</span>
+                현장 카드결제
+              </button>
+              <button onClick={() => setPayMethod('transfer')}
+                className={`py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1
+                  ${payMethod === 'transfer' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-gray-200 text-gray-600 hover:border-yellow-300'}`}>
+                <span className="text-2xl">🏦</span>
+                계좌이체
+              </button>
+            </div>
+            {payMethod === 'card' && (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
+                ✅ 방문 당일 현장에서 카드로 결제해 주세요.
+              </div>
+            )}
+            {payMethod === 'transfer' && (
+              <div className="mt-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-sm">
+                <p className="font-bold text-yellow-800 mb-2">🏦 입금 계좌 안내</p>
+                <div className="bg-white rounded-lg px-4 py-3 border border-yellow-200 text-center">
+                  <p className="text-lg font-black text-gray-800 tracking-wider">3333-33-4922639</p>
+                  <p className="text-sm text-gray-600 mt-0.5">카카오뱅크 · 정창덕</p>
+                </div>
+                <p className="text-xs text-yellow-700 mt-2">입금 시 예약자 이름으로 이체해 주세요.</p>
+              </div>
+            )}
+          </div>
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-xs text-yellow-800 leading-relaxed">
             📌 취소 정책: 48시간 전 전액 환불 / 24시간 전 50% 환불 / 당일 환불 불가
           </div>
@@ -301,9 +354,9 @@ export default function BookingWizard({ programType, program }: Props) {
             다음 →
           </button>
         ) : (
-          <button disabled={isPending} onClick={handleSubmit}
+          <button disabled={isPending || !payMethod} onClick={handleSubmit}
             className="flex-[2] bg-yellow-400 text-green-900 py-3 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors disabled:opacity-50">
-            {isPending ? '예약 중...' : '예약 신청하기 ✅'}
+            {isPending ? '예약 중...' : !payMethod ? '결제 방법을 선택해주세요' : '예약 신청하기 ✅'}
           </button>
         )}
       </div>

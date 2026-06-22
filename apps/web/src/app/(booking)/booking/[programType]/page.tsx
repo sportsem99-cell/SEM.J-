@@ -1,5 +1,6 @@
 import Header from '@/components/features/Header'
 import BookingWizard from '@/components/features/BookingWizard'
+import { createClient } from '@/lib/supabase/server'
 
 const PROGRAM_INFO: Record<string, { name: string; price: number; capacity: number }> = {
   experience: { name: '체험승마',       price: 30000, capacity: 6 },
@@ -8,11 +9,24 @@ const PROGRAM_INFO: Record<string, { name: string; price: number; capacity: numb
   youth:      { name: '유소년 프로그램', price: 35000, capacity: 6 },
 }
 
-export default function BookingPage({ params }: { params: { programType: string } }) {
+export default async function BookingPage({ params }: { params: { programType: string } }) {
   const program = PROGRAM_INFO[params.programType]
 
   if (!program) {
     return <div className="p-10 text-center text-gray-500">존재하지 않는 프로그램입니다.</div>
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  let savedProfile = null
+  if (user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('name, phone, birth_date, gender, height_cm, weight_kg, experience, allergy, allergy_desc, condition, condition_desc')
+      .eq('id', user.id)
+      .single()
+    savedProfile = data
   }
 
   return (
@@ -27,7 +41,7 @@ export default function BookingPage({ params }: { params: { programType: string 
           </p>
         </div>
 
-        <BookingWizard programType={params.programType} program={program} />
+        <BookingWizard programType={program.name} program={program} savedProfile={savedProfile} />
       </div>
     </>
   )

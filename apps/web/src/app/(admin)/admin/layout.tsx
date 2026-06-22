@@ -7,6 +7,8 @@ const NAV_ITEMS = [
   { href: '/admin/bookings',  label: '예약 관리',    icon: '📋' },
   { href: '/admin/resources', label: '리소스 관리',   icon: '🐴' },
   { href: '/admin/programs',  label: '프로그램 관리', icon: '🎯' },
+  { href: '/admin/members',   label: '멤버 관리',    icon: '👥' },
+  { href: '/admin/forms',    label: '서식 관리',    icon: '📝' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -32,7 +34,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
 
-        <div className="px-6 py-4 border-t border-green-600">
+        <div className="px-6 py-4 border-t border-green-600 space-y-2">
+          <Link href="/" className="flex items-center gap-3 px-0 py-2 text-sm text-green-200 hover:text-white transition-colors">
+            <span>🏠</span>
+            <span>메인 홈으로</span>
+          </Link>
           <LogoutButton />
         </div>
       </aside>
