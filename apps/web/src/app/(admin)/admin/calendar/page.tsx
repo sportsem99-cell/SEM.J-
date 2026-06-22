@@ -1,34 +1,46 @@
-export default function AdminCalendar() {
+import { createClient } from '@/lib/supabase/server'
+import AdminCalendarClient from './AdminCalendarClient'
+
+const ORG_ID = '00000000-0000-0000-0000-000000000001'
+
+interface SearchParams {
+  date?: string
+}
+
+export default async function AdminCalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
+  const supabase = await createClient()
+
+  const today = new Date().toISOString().split('T')[0]
+  const selectedDate = params.date || today
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select(`
+      id, status, start_at, end_at, total_amount,
+      programs ( name, type ),
+      booking_participants (
+        name, phone, gender, weight_kg, height_cm,
+        allergy, allergy_desc, condition, condition_desc,
+        experience, notes
+      )
+    `)
+    .eq('org_id', ORG_ID)
+    .gte('start_at', `${selectedDate}T00:00:00+09:00`)
+    .lte('start_at', `${selectedDate}T23:59:59+09:00`)
+    .order('start_at')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bookingList = (bookings ?? []) as any[]
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">예약 캘린더</h1>
-
-      {/* 리소스 필터 */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['전체', '강사', '말', '마장'].map((f) => (
-          <button
-            key={f}
-            className="px-4 py-1.5 rounded-full text-sm font-semibold border border-brand-green-700 text-brand-green-700 hover:bg-brand-green-700 hover:text-white transition-colors"
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {/* 캘린더 플레이스홀더 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-        <p className="text-5xl mb-4">📅</p>
-        <p className="font-bold text-gray-700 mb-2">리소스 타임라인 캘린더</p>
-        <p className="text-sm text-gray-500 mb-4">
-          강사 · 말 · 마장을 가로축(시간) × 세로축(리소스)으로 표시
-        </p>
-        <p className="text-xs text-gray-400 bg-gray-50 rounded-xl p-4 text-left leading-relaxed">
-          📌 Phase 2에서 FullCalendar resourceTimeline으로 구현 예정<br />
-          - 리소스별 예약 슬롯 시각화<br />
-          - 드래그로 예약 시간 변경<br />
-          - 충돌 시 자동 경고
-        </p>
-      </div>
-    </div>
+    <AdminCalendarClient
+      bookings={bookingList}
+      selectedDate={selectedDate}
+    />
   )
 }
