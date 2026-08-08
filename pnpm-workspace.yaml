@@ -2,11 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 
-allowBuilds:
-  unrs-resolver: set this to true or false
-
 onlyBuiltDependencies:
   - unrs-resolver
   - turbo
+  - "@turbo/windows-64"
   - esbuild
   - sharp
