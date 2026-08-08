@@ -41,9 +41,10 @@ interface Props {
   bookings: Booking[]
   currentStatus: string
   currentDate: string
+  statusCounts: Record<string, number>
 }
 
-export default function AdminBookingsClient({ bookings, currentStatus, currentDate }: Props) {
+export default function AdminBookingsClient({ bookings, currentStatus, currentDate, statusCounts }: Props) {
   const router = useRouter()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -63,16 +64,32 @@ export default function AdminBookingsClient({ bookings, currentStatus, currentDa
 
       {/* 필터 */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
-        {STATUS_TABS.map(tab => (
-          <button key={tab.value}
-            onClick={() => router.push(buildUrl(tab.value, currentDate))}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors
-              ${currentStatus === tab.value
-                ? 'bg-brand-green-700 text-white border-brand-green-700'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            {tab.label}
-          </button>
-        ))}
+        {STATUS_TABS.map(tab => {
+          const count = statusCounts[tab.value] ?? 0
+          const isActive = currentStatus === tab.value
+          return (
+            <button key={tab.value}
+              onClick={() => router.push(buildUrl(tab.value, currentDate))}
+              className={`relative px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors
+                ${isActive
+                  ? 'bg-brand-green-700 text-white border-brand-green-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              {tab.label}
+              {count > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center leading-none
+                    ${tab.value === 'pending'
+                      ? 'bg-red-500 text-white'
+                      : isActive
+                        ? 'bg-white text-brand-green-700'
+                        : 'bg-gray-400 text-white'}`}
+                >
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </button>
+          )
+        })}
         <input type="date" value={currentDate}
           onChange={e => router.push(buildUrl(currentStatus, e.target.value))}
           className="ml-auto text-sm border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-green-500" />

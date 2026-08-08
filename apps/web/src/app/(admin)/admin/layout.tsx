@@ -7,8 +7,9 @@ const NAV_ITEMS = [
   { href: '/admin/bookings',  label: '예약 관리',    icon: '📋' },
   { href: '/admin/resources', label: '리소스 관리',   icon: '🐴' },
   { href: '/admin/programs',  label: '프로그램 관리', icon: '🎯' },
-  { href: '/admin/members',   label: '멤버 관리',    icon: '👥' },
-  { href: '/admin/forms',    label: '서식 관리',    icon: '📝' },
+  { href: '/admin/members',       label: '회원 목록',      icon: '👥' },
+  { href: '/admin/blocked-dates', label: '예약불가 날짜',  icon: '🚫' },
+  { href: '/admin/forms',         label: '서식 관리',      icon: '📝' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

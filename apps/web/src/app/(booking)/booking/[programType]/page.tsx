@@ -1,19 +1,37 @@
+import { notFound } from 'next/navigation'
 import Header from '@/components/features/Header'
 import BookingWizard from '@/components/features/BookingWizard'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getBlockedDates } from '@/app/actions/slots'
 
-const PROGRAM_INFO: Record<string, { name: string; price: number; capacity: number }> = {
-  experience: { name: '체험승마',       price: 30000, capacity: 6 },
-  private:    { name: '개인레슨',       price: 60000, capacity: 1 },
-  group:      { name: '그룹레슨',       price: 40000, capacity: 6 },
-  youth:      { name: '유소년 프로그램', price: 35000, capacity: 6 },
-}
+const ORG_ID = '00000000-0000-0000-0000-000000000001'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default async function BookingPage({ params }: { params: { programType: string } }) {
-  const program = PROGRAM_INFO[params.programType]
+  const slug = params.programType
+  const adminSupabase = createAdminClient()
 
-  if (!program) {
-    return <div className="p-10 text-center text-gray-500">존재하지 않는 프로그램입니다.</div>
+  // UUID이면 id로 조회, 슬러그이면 type으로 조회
+  const query = adminSupabase
+    .from('programs')
+    .select('id, name, price, local_price, capacity, duration_min, is_active')
+    .eq('org_id', ORG_ID)
+
+  const { data: dbProgram } = await (
+    UUID_RE.test(slug)
+      ? query.eq('id', slug).single()
+      : query.eq('type', slug).single()
+  )
+
+  if (!dbProgram || !dbProgram.is_active) notFound()
+
+  const program = {
+    name:       dbProgram.name,
+    price:      dbProgram.price ?? 0,
+    localPrice: dbProgram.local_price ?? dbProgram.price ?? 0,
+    capacity:   dbProgram.capacity ?? 1,
   }
 
   const supabase = await createClient()
@@ -29,6 +47,8 @@ export default async function BookingPage({ params }: { params: { programType: s
     savedProfile = data
   }
 
+  const blockedDates = await getBlockedDates()
+
   return (
     <>
       <Header />
@@ -36,12 +56,24 @@ export default async function BookingPage({ params }: { params: { programType: s
         <div className="mb-8">
           <p className="text-sm text-brand-green-600 font-semibold mb-1">예약</p>
           <h1 className="text-2xl font-bold text-gray-800">{program.name}</h1>
-          <p className="text-brand-green-700 font-bold text-lg mt-1">
-            {program.price.toLocaleString()}원 / 1회 (60분)
-          </p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <p className="text-brand-green-700 font-bold text-lg">
+              {program.price.toLocaleString()}원
+            </p>
+            {program.localPrice !== program.price && (
+              <span className="text-xs bg-amber-50 border border-amber-200 text-amber-700 font-bold px-2.5 py-1 rounded-full">
+                군민 {program.localPrice.toLocaleString()}원
+              </span>
+            )}
+          </div>
         </div>
 
-        <BookingWizard programType={program.name} program={program} savedProfile={savedProfile} />
+        <BookingWizard
+          programId={dbProgram.id}
+          program={program}
+          savedProfile={savedProfile}
+          blockedDates={blockedDates}
+        />
       </div>
     </>
   )

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import LogoutButton from './LogoutButton'
+import MobileNav from './MobileNav'
 import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/isAdmin'
 
@@ -46,11 +47,11 @@ export default async function Header() {
         ))}
       </nav>
 
-      <div className="flex items-center gap-3 text-sm">
+      <div className="hidden md:flex items-center gap-3 text-sm">
         {user ? (
           <>
-            <Link href="/my/bookings" className="hover:text-yellow-300 transition-colors hidden sm:inline">내 예약</Link>
-            <Link href="/my/profile" className="hover:text-yellow-300 transition-colors hidden sm:inline">내 정보</Link>
+            <Link href="/my/bookings" className="hover:text-yellow-300 transition-colors">내 예약</Link>
+            <Link href="/my/profile" className="hover:text-yellow-300 transition-colors">내 정보</Link>
             {isAdmin && (
               <Link href="/admin" className="bg-yellow-400 text-green-900 px-3 py-1 rounded-full font-bold text-xs hover:bg-yellow-300 transition-colors">
                 관리자
@@ -64,6 +65,8 @@ export default async function Header() {
           </Link>
         )}
       </div>
+
+      <MobileNav nav={NAV} isLoggedIn={!!user} isAdmin={isAdmin} />
     </header>
   )
 }

@@ -2,13 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Noto+Serif+KR:wght@400;600;700&display=swap');
+
 @layer base {
   :root {
     --brand-green: #2d6a2d;
-    --brand-gold: #d4af37;
+    --brand-gold: #b8973a;
+    --cream: #faf7f2;
+    --charcoal: #1c1c1c;
   }
 
   body {
     @apply bg-white text-gray-900 antialiased;
+    font-feature-settings: 'kern' 1;
   }
+
+  .font-display {
+    font-family: 'Cormorant Garamond', 'Noto Serif KR', serif;
+  }
+}
+
+@layer utilities {
+  .text-gold {
+    color: var(--brand-gold);
+  }
+  .bg-cream {
+    background-color: var(--cream);
+  }
+  .bg-charcoal {
+    background-color: var(--charcoal);
+  }
+}
+
+/* 히어로 그레인 오버레이 */
+.hero-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 골드 언더라인 */
+.gold-underline {
+  position: relative;
+  display: inline-block;
+}
+.gold-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-gold), transparent);
+  border-radius: 2px;
+}
+
+/* 섹션 구분선 */
+.section-divider {
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brand-gold), transparent);
+  margin: 0 auto;
+}
+
+/* 카드 호버 */
+.card-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px -12px rgba(0,0,0,0.15);
+}
+
+/* 스크롤 페이드 (선택적) */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.7s ease forwards;
 }

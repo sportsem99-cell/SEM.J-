@@ -5,6 +5,7 @@ const ORG_ID = '00000000-0000-0000-0000-000000000001'
 
 interface SearchParams {
   date?: string
+  view?: string
 }
 
 export default async function AdminCalendarPage({
@@ -17,6 +18,12 @@ export default async function AdminCalendarPage({
 
   const today = new Date().toISOString().split('T')[0]
   const selectedDate = params.date || today
+  const view = (params.view as 'day' | 'week' | 'month') || 'month'
+
+  // 선택된 날짜 기준으로 해당 월 전체 + 앞뒤 여유 가져오기
+  const base = new Date(selectedDate)
+  const rangeStart = new Date(base.getFullYear(), base.getMonth() - 1, 25)
+  const rangeEnd = new Date(base.getFullYear(), base.getMonth() + 2, 5)
 
   const { data: bookings } = await supabase
     .from('bookings')
@@ -30,17 +37,17 @@ export default async function AdminCalendarPage({
       )
     `)
     .eq('org_id', ORG_ID)
-    .gte('start_at', `${selectedDate}T00:00:00+09:00`)
-    .lte('start_at', `${selectedDate}T23:59:59+09:00`)
+    .gte('start_at', rangeStart.toISOString())
+    .lte('start_at', rangeEnd.toISOString())
+    .not('status', 'eq', 'cancelled')
     .order('start_at')
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bookingList = (bookings ?? []) as any[]
 
   return (
     <AdminCalendarClient
-      bookings={bookingList}
+      bookings={(bookings ?? []) as any[]}
       selectedDate={selectedDate}
+      initialView={view}
+      today={today}
     />
   )
 }

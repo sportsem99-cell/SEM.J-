@@ -1,9 +1,18 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { createBooking, type BookingFormData } from '@/app/actions/booking'
+import { getAvailableSlots } from '@/app/actions/slots'
+import { getCouponsByPhone } from '@/app/actions/coupons'
 
 type Step = 1 | 2 | 3 | 4 | 5
+
+interface SlotInfo {
+  time: string
+  available: boolean
+  current: number
+  max: number
+}
 
 interface SavedProfile {
   name?: string | null; phone?: string | null; birth_date?: string | null
@@ -13,21 +22,28 @@ interface SavedProfile {
 }
 
 interface Props {
-  programType: string
-  program: { name: string; price: number; capacity: number }
+  programId: string
+  program: { name: string; price: number; localPrice: number; capacity: number }
   savedProfile?: SavedProfile | null
+  blockedDates?: string[]
 }
-
-const TIMES = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00']
 
 const STEP_LABELS = ['날짜·시간', '예약자', '이용자', '건강정보', '최종확인']
 
-export default function BookingWizard({ programType, program, savedProfile }: Props) {
+export default function BookingWizard({ programId, program, savedProfile, blockedDates = [] }: Props) {
   const [step, setStep] = useState<Step>(1)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [payMethod, setPayMethod] = useState<'card' | 'transfer' | 'coupon' | ''>('')
+  const [slots, setSlots] = useState<SlotInfo[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [coupons, setCoupons] = useState<{ id: string; holderName: string | null; remaining: number; expiresAt: string | null; programName: string | null }[]>([])
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null)
+  const [couponsLoading, setCouponsLoading] = useState(false)
 
-  const [payMethod, setPayMethod] = useState<'card' | 'transfer' | ''>('')
+  const [residentType, setResidentType] = useState<'general' | 'local'>('general')
+  const finalPrice = residentType === 'local' ? program.localPrice : program.price
+  const hasDiscount = program.localPrice !== program.price
 
   const [form, setForm] = useState({
     date: '', time: '',
@@ -50,8 +66,41 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
   const u = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }))
   const today = new Date().toISOString().split('T')[0]
 
+  // 날짜 선택 시 슬롯 조회
+  useEffect(() => {
+    if (!form.date) { setSlots([]); return }
+    setSlotsLoading(true)
+    getAvailableSlots(form.date, programId).then(result => {
+      setSlots(result)
+      setSlotsLoading(false)
+      // 선택한 시간이 마감됐으면 초기화
+      if (form.time) {
+        const found = result.find(s => s.time === form.time)
+        if (found && !found.available) u('time', '')
+      }
+    })
+  }, [form.date])
+
+  // Step 5 진입 시 쿠폰 조회
+  useEffect(() => {
+    if (step !== 5 || !form.bookerPhone) return
+    setCouponsLoading(true)
+    getCouponsByPhone(form.bookerPhone, programId).then(result => {
+      setCoupons(result)
+      setCouponsLoading(false)
+    })
+  }, [step])
+
+  // 날짜가 예약불가인지 확인 (월요일 또는 blocked_dates)
+  const isDateBlocked = (dateStr: string) => {
+    if (!dateStr) return false
+    const d = new Date(dateStr)
+    if (d.getDay() === 1) return true // 월요일
+    return blockedDates.includes(dateStr)
+  }
+
   const canNext = () => {
-    if (step === 1) return !!form.date && !!form.time
+    if (step === 1) return !!form.date && !!form.time && !isDateBlocked(form.date)
     if (step === 2) return !!form.bookerName && !!form.bookerPhone
     if (step === 3) {
       const nameOk = form.sameAsBooker || !!form.riderName
@@ -64,7 +113,7 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
     setError('')
     startTransition(async () => {
       const data: BookingFormData = {
-        programType,
+        programId,
         date: form.date,
         time: form.time,
         bookerName: form.bookerName,
@@ -80,7 +129,9 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
         condition: form.condition,
         conditionDesc: form.conditionDesc,
         notes: form.notes,
-        totalAmount: program.price,
+        totalAmount: finalPrice,
+        couponId: payMethod === 'coupon' ? selectedCouponId : null,
+        paymentMethod: (payMethod || 'card') as 'card' | 'transfer' | 'coupon',
       }
       const result = await createBooking(data)
       if (result?.error) setError(result.error)
@@ -108,21 +159,44 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">날짜 선택 *</label>
             <input type="date" min={today} value={form.date}
-              onChange={e => u('date', e.target.value)}
+              onChange={e => { u('date', e.target.value); u('time', '') }}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green-500" />
+
+            {/* 예약불가 날짜 경고 */}
+            {form.date && isDateBlocked(form.date) && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                🚫 {new Date(form.date).getDay() === 1 ? '월요일은 휴장일입니다.' : '해당 날짜는 예약이 불가능합니다.'} 다른 날짜를 선택해주세요.
+              </div>
+            )}
           </div>
-          {form.date && (
+
+          {form.date && !isDateBlocked(form.date) && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">시간 선택 *</label>
-              <div className="grid grid-cols-4 gap-2">
-                {TIMES.map(t => (
-                  <button key={t} onClick={() => u('time', t)}
-                    className={`py-2.5 rounded-xl text-sm font-semibold border transition-colors
-                      ${form.time === t ? 'bg-brand-green-700 text-white border-brand-green-700' : 'border-gray-200 text-gray-700 hover:border-brand-green-500'}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
+              {slotsLoading ? (
+                <div className="text-center py-6 text-gray-400 text-sm">가용 시간 확인 중...</div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {slots.map(s => (
+                    <button key={s.time}
+                      disabled={!s.available}
+                      onClick={() => s.available && u('time', s.time)}
+                      className={`py-2.5 rounded-xl text-xs font-semibold border transition-colors relative
+                        ${!s.available
+                          ? 'bg-gray-100 border-gray-100 text-gray-300 cursor-not-allowed'
+                          : form.time === s.time
+                            ? 'bg-brand-green-700 text-white border-brand-green-700'
+                            : 'border-gray-200 text-gray-700 hover:border-brand-green-500'}`}>
+                      {s.time}
+                      {!s.available && <span className="block text-[10px] text-gray-300">마감</span>}
+                      {s.available && s.current > 0 && (
+                        <span className="block text-[10px] text-yellow-600">{s.current}/{s.max}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-400 mt-2">* 회색 시간은 예약이 마감된 슬롯입니다</p>
             </div>
           )}
         </div>
@@ -132,6 +206,43 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
       {step === 2 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
           <p className="text-sm text-gray-500">예약 확인 문자를 받으실 분의 정보입니다.</p>
+
+          {/* 군민/일반 선택 */}
+          {hasDiscount && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">거주지 구분 *</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setResidentType('general')}
+                  className={`py-3.5 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1
+                    ${residentType === 'general'
+                      ? 'border-brand-green-700 bg-brand-green-50 text-brand-green-700'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                >
+                  <span className="text-lg">🙋</span>
+                  <span>일반</span>
+                  <span className="text-xs font-semibold opacity-70">{program.price.toLocaleString()}원</span>
+                </button>
+                <button
+                  onClick={() => setResidentType('local')}
+                  className={`py-3.5 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-1
+                    ${residentType === 'local'
+                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      : 'border-gray-200 text-gray-500 hover:border-amber-200'}`}
+                >
+                  <span className="text-lg">🏘️</span>
+                  <span>괴산군 군민</span>
+                  <span className="text-xs font-semibold opacity-70">{program.localPrice.toLocaleString()}원</span>
+                </button>
+              </div>
+              {residentType === 'local' && (
+                <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+                  🏘️ 군민 할인가가 적용됩니다. 현장에서 주민등록증 등 거주지 확인이 필요할 수 있습니다.
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">이름 *</label>
             <input type="text" placeholder="홍길동" value={form.bookerName}
@@ -229,11 +340,11 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">알레르기 여부 *</label>
             <div className="flex gap-2 mb-2">
-              {[['있음', true], ['없음', false]].map(([label, val]) => (
-                <button key={String(label)} onClick={() => u('allergy', val)}
+              {([['있음', true], ['없음', false]] as const).map(([label, val]) => (
+                <button key={label} onClick={() => u('allergy', val)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors
                     ${form.allergy === val ? (val ? 'bg-red-50 text-red-700 border-red-300' : 'bg-brand-green-700 text-white border-brand-green-700') : 'border-gray-200 text-gray-700'}`}>
-                  {String(label)}
+                  {label}
                 </button>
               ))}
             </div>
@@ -246,11 +357,11 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">기저질환 여부 *</label>
             <div className="flex gap-2 mb-2">
-              {[['있음', true], ['없음', false]].map(([label, val]) => (
-                <button key={String(label)} onClick={() => u('condition', val)}
+              {([['있음', true], ['없음', false]] as const).map(([label, val]) => (
+                <button key={label} onClick={() => u('condition', val)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors
                     ${form.condition === val ? (val ? 'bg-red-50 text-red-700 border-red-300' : 'bg-brand-green-700 text-white border-brand-green-700') : 'border-gray-200 text-gray-700'}`}>
-                  {String(label)}
+                  {label}
                 </button>
               ))}
             </div>
@@ -278,7 +389,8 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
               ['프로그램', program.name],
               ['날짜', form.date],
               ['시간', form.time],
-              ['예약자', `${form.bookerName} (${form.bookerPhone})`],
+              ['구분', hasDiscount ? (residentType === 'local' ? '괴산군 군민 (할인 적용)' : '일반') : '일반'],
+            ['예약자', `${form.bookerName} (${form.bookerPhone})`],
               ['이용자', form.sameAsBooker ? form.bookerName : form.riderName],
               ['성별', form.riderGender],
               ['몸무게', form.riderWeightKg ? `${form.riderWeightKg}kg` : '-'],
@@ -292,14 +404,76 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
                 <span className="font-semibold text-gray-800">{v || '-'}</span>
               </div>
             ))}
-            <div className="border-t border-gray-200 pt-2.5 flex justify-between">
+            <div className="border-t border-gray-200 pt-2.5 flex justify-between items-center">
               <span className="font-bold text-gray-700">총 금액</span>
-              <span className="font-bold text-brand-green-700 text-base">{program.price.toLocaleString()}원</span>
+              <div className="text-right">
+                {residentType === 'local' && hasDiscount && (
+                  <p className="text-xs text-gray-400 line-through">{program.price.toLocaleString()}원</p>
+                )}
+                <span className="font-bold text-brand-green-700 text-base">{finalPrice.toLocaleString()}원</span>
+                {residentType === 'local' && hasDiscount && (
+                  <span className="ml-2 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">군민 할인</span>
+                )}
+              </div>
             </div>
           </div>
+
           {/* 결제 방법 선택 */}
           <div>
             <p className="text-sm font-bold text-gray-700 mb-3">결제 방법 선택 *</p>
+
+            {/* 쿠폰 옵션 (보유 쿠폰이 있을 때) */}
+            {couponsLoading && (
+              <div className="mb-3 text-xs text-gray-400 text-center py-2">쿠폰 확인 중...</div>
+            )}
+            {!couponsLoading && coupons.length > 0 && (
+              <div className="mb-3">
+                <button
+                  onClick={() => { setPayMethod('coupon'); setSelectedCouponId(coupons[0].id) }}
+                  className={`w-full py-4 rounded-xl border-2 font-bold text-sm transition-all flex items-center justify-between px-5
+                    ${payMethod === 'coupon' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-600 hover:border-purple-300'}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-2xl">🎟</span>
+                    <span>쿠폰 사용</span>
+                  </span>
+                  <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
+                    {coupons.reduce((s, c) => s + c.remaining, 0)}장 보유
+                  </span>
+                </button>
+
+                {/* 쿠폰 선택 목록 */}
+                {payMethod === 'coupon' && (
+                  <div className="mt-2 space-y-2">
+                    {coupons.map(c => (
+                      <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all
+                        ${selectedCouponId === c.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-200'}`}>
+                        <input
+                          type="radio" name="coupon" value={c.id}
+                          checked={selectedCouponId === c.id}
+                          onChange={() => setSelectedCouponId(c.id)}
+                          className="accent-purple-600"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-gray-800">
+                            {c.programName ? `${c.programName} 이용권` : '전 프로그램 이용권'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            잔여 {c.remaining}회
+                            {c.expiresAt && ` · 만료 ${c.expiresAt}`}
+                          </p>
+                        </div>
+                        <span className="text-lg font-black text-purple-600">{c.remaining}장</span>
+                      </label>
+                    ))}
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-800">
+                      🎟 쿠폰 사용 시 결제 금액이 0원으로 처리됩니다.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => setPayMethod('card')}
                 className={`py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1
@@ -354,7 +528,7 @@ export default function BookingWizard({ programType, program, savedProfile }: Pr
             다음 →
           </button>
         ) : (
-          <button disabled={isPending || !payMethod} onClick={handleSubmit}
+          <button disabled={isPending || !payMethod || (payMethod === 'coupon' && !selectedCouponId)} onClick={handleSubmit}
             className="flex-[2] bg-yellow-400 text-green-900 py-3 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors disabled:opacity-50">
             {isPending ? '예약 중...' : !payMethod ? '결제 방법을 선택해주세요' : '예약 신청하기 ✅'}
           </button>

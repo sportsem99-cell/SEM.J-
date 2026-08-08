@@ -2,6 +2,7 @@ import Header from '@/components/features/Header'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import CancelBookingButton from '@/components/features/CancelBookingButton'
 
 const TABS = [
   { key: 'pending',   label: '대기 중',  color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
@@ -33,7 +34,7 @@ export default async function MyBookingsPage({
 
   const { data: allBookings } = await supabase
     .from('bookings')
-    .select(`id, status, start_at, end_at, total_amount, created_at, cancel_reason, programs ( name, type )`)
+    .select(`id, status, start_at, end_at, total_amount, created_at, cancel_reason, payment_method, programs ( name, type )`)
     .eq('user_id', user.id)
     .order('start_at', { ascending: false })
 
@@ -103,36 +104,48 @@ function BookingCard({ booking }: { booking: any }) {
   const isCancelled = booking.status === 'cancelled'
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-5 ${isCancelled ? 'border-red-100 opacity-80' : 'border-gray-200'}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="font-bold text-gray-800">{booking.programs?.name ?? '프로그램'}</p>
-          <p className="text-sm text-gray-500 mt-1">
-            {startDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}{' '}
-            {startDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-          </p>
-          <p className="text-sm font-semibold text-brand-green-700 mt-1">
-            {booking.total_amount?.toLocaleString()}원
-          </p>
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isCancelled ? 'border-red-100 opacity-80' : 'border-gray-200'}`}>
+      <Link href={`/my/bookings/${booking.id}`} className="block p-5 hover:bg-gray-50 transition-colors">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-bold text-gray-800">{booking.programs?.name ?? '프로그램'}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {startDate.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}{' '}
+              {startDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              {booking.payment_method === 'coupon' ? (
+                <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">🎟 쿠폰 사용</span>
+              ) : (
+                <p className="text-sm font-semibold text-brand-green-700">
+                  {booking.total_amount?.toLocaleString()}원
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[booking.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {TABS.find(t => t.key === booking.status)?.label ?? booking.status}
+            </span>
+            <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </div>
         </div>
-        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[booking.status] ?? 'bg-gray-100 text-gray-600'}`}>
-          {TABS.find(t => t.key === booking.status)?.label ?? booking.status}
-        </span>
-      </div>
+      </Link>
+
+      {/* 취소 버튼 (대기/확정 상태만) */}
+      {(booking.status === 'pending' || booking.status === 'confirmed') && (
+        <div className="px-5 pb-5">
+          <CancelBookingButton bookingId={booking.id} startAt={booking.start_at} />
+        </div>
+      )}
 
       {/* 취소 사유 + 재예약 */}
-      {isCancelled && (
-        <div className="mt-4 pt-4 border-t border-red-100">
-          {booking.cancel_reason && (
-            <div className="bg-red-50 rounded-xl p-3 mb-3">
-              <p className="text-xs font-bold text-red-600 mb-1">취소 사유</p>
-              <p className="text-sm text-red-700">{booking.cancel_reason}</p>
-            </div>
-          )}
-          <Link href={`/programs`}
-            className="inline-block bg-brand-green-700 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-brand-green-600 transition-colors">
-            재예약 신청하기
-          </Link>
+      {isCancelled && booking.cancel_reason && (
+        <div className="px-5 pb-5 pt-0">
+          <div className="bg-red-50 rounded-xl p-3">
+            <p className="text-xs font-bold text-red-600 mb-1">취소 사유</p>
+            <p className="text-sm text-red-700">{booking.cancel_reason}</p>
+          </div>
         </div>
       )}
     </div>

@@ -25,9 +25,12 @@ const config: Config = {
             600: '#9a7c0a',
           },
         },
+        cream: '#faf7f2',
+        charcoal: '#1c1c1c',
       },
       fontFamily: {
         sans: ['Pretendard', 'sans-serif'],
+        display: ['Cormorant Garamond', 'Noto Serif KR', 'serif'],
       },
     },
   },
